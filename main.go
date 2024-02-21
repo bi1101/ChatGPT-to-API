@@ -2,11 +2,20 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"freechatgpt/internal/tokens"
+	"freechatgpt/pkg/db"
+	"freechatgpt/pkg/env"
+	"freechatgpt/pkg/funcaptcha"
+	"freechatgpt/pkg/logger"
+	"freechatgpt/pkg/plugins"
+	"freechatgpt/pkg/plugins/api/unofficialapi"
+	"log"
+	"net/http"
 	"os"
 	"strings"
 
-	"github.com/acheong08/endless"
+	// "github.com/acheong08/endless"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
@@ -80,8 +89,22 @@ func main() {
 	admin_routes.PATCH("/password", passwordHandler)
 	admin_routes.PATCH("/tokens", tokensHandler)
 	/// Public routes
-	router.OPTIONS("/v1/chat/completions", optionsHandler)
-	router.POST("/v1/chat/completions", Authorization, nightmare)
-	router.GET("/v1/models", Authorization, simulateModel)
-	endless.ListenAndServeTLS(HOST+":"+PORT, tlsCert, tlsKey, router)
+	router.Use(RouteHTTPOrWssMiddleware())
+	component := &plugins.Component{
+		Engine: router,
+		Db: db.DB{
+			GetRedisClient: db.GetRedisClient,
+		},
+		Logger: logger.Log,
+		Env:    &env.Env,
+		Auth:   funcaptcha.GetOpenAIArkoseToken,
+	}
+	targetPlug := &unofficialapi.UnofficialApiProcessInstance
+	targetPlug.Run(component)
+	// router.OPTIONS("/v1/chat/completions", optionsHandler)
+	// router.POST("/v1/chat/completions", Authorization, nightmare)
+	router.GET("/models", Authorization, simulateModel)
+	if err := http.ListenAndServeTLS(fmt.Sprintf("%v:%v", HOST, PORT), tlsCert, tlsKey, router); err != nil {
+		log.Fatal(err)
+	}
 }

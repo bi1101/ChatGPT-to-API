@@ -32,7 +32,7 @@ var (
 	FILES_REVERSE_PROXY = os.Getenv("FILES_REVERSE_PROXY")
 )
 
-func POSTconversation(message chatgpt_types.ChatGPTRequest, access_token string, puid string, proxy string) (*http.Response, error) {
+func POSTconversation(message chatgpt_types.ChatGPTRequest, access_token string, puid string, proxy string) (*http.Response, bool, error) {
 	if proxy != "" {
 		client.SetProxy(proxy)
 	}
@@ -45,12 +45,12 @@ func POSTconversation(message chatgpt_types.ChatGPTRequest, access_token string,
 	// JSONify the body and add it to the request
 	body_json, err := json.Marshal(message)
 	if err != nil {
-		return &http.Response{}, err
+		return &http.Response{}, false, err
 	}
 
 	request, err := http.NewRequest(http.MethodPost, apiUrl, bytes.NewBuffer(body_json))
 	if err != nil {
-		return &http.Response{}, err
+		return &http.Response{}, false, err
 	}
 	// If PUID is not provided, check the environment
 	if puid == "" {
@@ -69,10 +69,14 @@ func POSTconversation(message chatgpt_types.ChatGPTRequest, access_token string,
 		request.Header.Set("Authorization", "Bearer "+access_token)
 	}
 	if err != nil {
-		return &http.Response{}, err
+		return &http.Response{}, false, err
 	}
 	response, err := client.Do(request)
-	return response, err
+	buff := &bytes.Buffer{}
+	io.Copy(buff, response.Body)
+	ok := strings.Contains(buff.String(), "wss_url")
+	response.Body = io.NopCloser(buff)
+	return response, ok, err
 }
 
 // Returns whether an error was handled

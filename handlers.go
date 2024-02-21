@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	chatgpt_request_converter "freechatgpt/conversion/requests/chatgpt"
 	chatgpt "freechatgpt/internal/chatgpt"
 	"freechatgpt/internal/gemini/api"
@@ -87,6 +88,93 @@ func simulateModel(c *gin.Context) {
 		},
 	})
 }
+func RouteHTTPOrWssMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		tk := ACCESS_TOKENS.GetValues()
+		if len(tk) == 0 {
+			c.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+		c.Request.Header.Set("Authorization", fmt.Sprintf("Bearer %v", tk[0]))
+		if c.Request.URL.Path != "/v1/chat/completions" {
+			c.Next()
+			return
+		}
+		var original_request official_types.APIRequest
+		// err := c.ShouldBindBodyWith(&original_request, binding.JSON)
+		buff := &bytes.Buffer{}
+		_, err := io.Copy(buff, c.Request.Body)
+		if err != nil {
+			c.JSON(400, gin.H{"error": gin.H{
+				"message": "Request must be proper JSON",
+				"type":    "invalid_request_error",
+				"param":   nil,
+				"code":    err.Error(),
+			}})
+			c.Abort()
+			return
+		}
+		if err := json.Unmarshal(buff.Bytes(), &original_request); err != nil {
+			c.JSON(400, gin.H{"error": gin.H{
+				"message": "Request must be proper JSON",
+				"type":    "invalid_request_error",
+				"param":   nil,
+				"code":    err.Error(),
+			}})
+			c.Abort()
+			return
+		}
+
+		c.Request.Body = io.NopCloser(buff)
+		if original_request.Model == "gemini-pro" {
+			api.ChatProxyHandler(c)
+			c.Abort()
+			return
+		}
+
+		if original_request.Model == "gemini-pro-vision" {
+			api.VisionProxyHandler(c)
+			c.Abort()
+			return
+		}
+
+		authHeader := c.GetHeader("Authorization")
+		token, puid := getSecret()
+		if authHeader != "" {
+			customAccessToken := strings.Replace(authHeader, "Bearer ", "", 1)
+			// Check if customAccessToken starts with sk-
+			if strings.HasPrefix(customAccessToken, "eyJhbGciOiJSUzI1NiI") {
+				token = customAccessToken
+			}
+		}
+		var proxy_url string
+		if len(proxies) == 0 {
+			proxy_url = ""
+		} else {
+			proxy_url = proxies[0]
+			// Push used proxy to the back of the list
+			proxies = append(proxies[1:], proxies[0])
+		}
+
+		// Convert the chat request to a ChatGPT request
+		translated_request := chatgpt_request_converter.ConvertAPIRequest(original_request, puid, proxy_url)
+
+		_, ok, err := chatgpt.POSTconversation(translated_request, token, puid, proxy_url)
+		if err != nil {
+			c.JSON(500, gin.H{
+				"error": "error sending request",
+			})
+			c.Abort()
+			return
+		}
+		if ok {
+			c.Next()
+		} else {
+			nightmare(c)
+			c.Abort()
+		}
+	}
+}
 func nightmare(c *gin.Context) {
 	var original_request official_types.APIRequest
 	if c.Request.ContentLength == 0 {
@@ -120,15 +208,15 @@ func nightmare(c *gin.Context) {
 	// }
 
 	c.Request.Body = io.NopCloser(bytes.NewReader(buff.Bytes()))
-	if original_request.Model == "gemini-pro" {
-		api.ChatProxyHandler(c)
-		return
-	}
+	//if original_request.Model == "gemini-pro" {
+	//	api.ChatProxyHandler(c)
+	//	return
+	//}
 
-	if original_request.Model == "gemini-pro-vision" {
-		api.VisionProxyHandler(c)
-		return
-	}
+	//if original_request.Model == "gemini-pro-vision" {
+	//	api.VisionProxyHandler(c)
+	//	return
+	//}
 
 	authHeader := c.GetHeader("Authorization")
 	token, puid := getSecret()
@@ -152,7 +240,7 @@ func nightmare(c *gin.Context) {
 	// Convert the chat request to a ChatGPT request
 	translated_request := chatgpt_request_converter.ConvertAPIRequest(original_request, puid, proxy_url)
 
-	response, err := chatgpt.POSTconversation(translated_request, token, puid, proxy_url)
+	response, _, err := chatgpt.POSTconversation(translated_request, token, puid, proxy_url)
 	if err != nil {
 		c.JSON(500, gin.H{
 			"error": "error sending request",
@@ -180,7 +268,7 @@ func nightmare(c *gin.Context) {
 		if strings.HasPrefix(original_request.Model, "gpt-4") {
 			chatgpt_request_converter.RenewTokenForRequest(&translated_request, puid, proxy_url)
 		}
-		response, err = chatgpt.POSTconversation(translated_request, token, puid, proxy_url)
+		response, _, err = chatgpt.POSTconversation(translated_request, token, puid, proxy_url)
 		if err != nil {
 			c.JSON(500, gin.H{
 				"error": "error sending request",

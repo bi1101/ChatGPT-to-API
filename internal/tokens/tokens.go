@@ -33,6 +33,14 @@ func (a *AccessToken) GetKeys() []string {
 	return keys
 }
 
+func (a *AccessToken) GetValues() []string {
+	keys := []string{}
+	for _, k := range a.tokens {
+		keys = append(keys, k.Token)
+	}
+	return keys
+}
+
 func (a *AccessToken) Delete(name string) {
 	delete(a.tokens, name)
 }
