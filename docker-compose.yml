@@ -2,7 +2,9 @@ version: '3'
 
 services:
   app:
-    image: acheong08/chatgpt-to-api # 总是使用latest,更新时重新pull该tag镜像即可
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: chatgpttoapi
     restart: unless-stopped
     ports:
@@ -12,4 +14,10 @@ services:
       SERVER_PORT: 8080
       ADMIN_PASSWORD: TotallySecurePassword
       # If the parameter API_REVERSE_PROXY is empty, the default request URL is https://chat.openai.com/backend-api/conversation, and the PUID is <NOT> equired.
-      PUID: xxx
+      #PUID: xxx
+    volumes:
+      - ./access_tokens.json:/app/access_tokens.json
+      - ./cookies.json:/app/cookies.json
+      - ./accounts.txt:/app/accounts.txt
+      - ./proxies.txt:/app/proxies.txt
+      - ./harPool:/app/harPool
