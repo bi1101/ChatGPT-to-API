@@ -25,3 +25,4 @@ services:
       - ./accounts.txt:/app/accounts.txt
       - ./proxies.txt:/app/proxies.txt
       - ./harPool:/app/harPool
+      - ./gemini-api-key.json:/app/gemini-api-key.json
