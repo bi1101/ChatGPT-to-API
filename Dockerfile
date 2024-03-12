@@ -5,6 +5,8 @@ FROM golang:1.20.3-alpine as builder
 # We set it to 0 to build a fully static binary for our final image
 ENV CGO_ENABLED=0
 
+WORKDIR /tls
+
 # Set the working directory
 WORKDIR /app
 
@@ -26,11 +28,13 @@ FROM scratch
 # Set the working directory
 WORKDIR /app
 
+COPY ./ca-certificates.crt /etc/ssl/certs/
+
 # Copy the built Go binary from the builder stage
 COPY --from=builder /app/ChatGPT-To-API /app/ChatGPT-To-API
 
 # Expose the port where the application is running
-EXPOSE 8080
+EXPOSE 443
 
 # Start the application
 CMD [ "./ChatGPT-To-API" ]
