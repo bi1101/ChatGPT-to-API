@@ -280,6 +280,9 @@ func GetImageSource(wg *sync.WaitGroup, url string, prompt string, token string,
 	if err != nil {
 		return
 	}
+	if puid == "" {
+		puid = os.Getenv("PUID")
+	}
 	// Clear cookies
 	if puid != "" {
 		request.Header.Set("Cookie", "_puid="+puid+";")
