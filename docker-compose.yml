@@ -2,7 +2,7 @@ version: '3'
 
 services:
   app:
-    image: bi1101:chatgpt-to-api:latest
+    image: bi1101/chatgpt-to-api:latest
     container_name: chatgpttoapi
     restart: unless-stopped
     ports:
