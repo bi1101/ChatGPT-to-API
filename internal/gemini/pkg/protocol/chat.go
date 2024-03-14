@@ -157,10 +157,10 @@ func SetGenaiChatByOpenaiRequest(cs *genai.ChatSession, req openai.ChatCompletio
 }
 
 func SetGenaiModelByOpenaiRequest(model *genai.GenerativeModel, req openai.ChatCompletionRequest) {
-	if req.MaxTokens != 0 {
+	/* if req.MaxTokens != 0 {
 		maxToken := int32(req.MaxTokens)
 		model.MaxOutputTokens = &maxToken
-	}
+	} */
 	if req.Temperature != 0 {
 		model.Temperature = &req.Temperature
 	}
