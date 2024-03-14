@@ -16,6 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/generative-ai-go/genai"
 	openai "github.com/sashabaranov/go-openai"
+	"github.com/zhu327/gemini-openai-proxy/pkg/adapter"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 
@@ -30,28 +31,114 @@ func IndexHandler(c *gin.Context) {
 }
 
 func ModelListHandler(c *gin.Context) {
-	model := openai.Model{
-		CreatedAt: 1686935002,
-		ID:        openai.GPT3Dot5Turbo,
-		Object:    "model",
-		OwnedBy:   "openai",
-	}
-
 	c.JSON(http.StatusOK, gin.H{
 		"object": "list",
-		"data":   []any{model},
+		"data": []any{
+			openai.Model{
+				CreatedAt: 1686935002,
+				ID:        openai.GPT3Dot5Turbo,
+				Object:    "model",
+				OwnedBy:   "openai",
+			},
+			openai.Model{
+				CreatedAt: 1686935002,
+				ID:        openai.GPT4VisionPreview,
+				Object:    "model",
+				OwnedBy:   "openai",
+			},
+		},
 	})
 }
 
 func ModelRetrieveHandler(c *gin.Context) {
-	model := openai.Model{
+	model := c.Param("model")
+	c.JSON(http.StatusOK, openai.Model{
 		CreatedAt: 1686935002,
-		ID:        openai.GPT3Dot5Turbo,
+		ID:        model,
 		Object:    "model",
 		OwnedBy:   "openai",
+	})
+}
+
+func ChatProxyHandler(c *gin.Context) {
+	openaiAPIKey, err := getRandomAPIKey()
+	if err != nil {
+		log.Printf("Error getting API key: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve API key from gemini-api-key.json file"})
+		return
+	}
+	var req = &adapter.ChatCompletionRequest{}
+	// Bind the JSON data from the request to the struct
+	if err := c.ShouldBindJSON(req); err != nil {
+		c.JSON(http.StatusBadRequest, openai.APIError{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
 	}
 
-	c.JSON(http.StatusOK, model)
+	ctx := c.Request.Context()
+	client, err := genai.NewClient(ctx, option.WithAPIKey(openaiAPIKey))
+	if err != nil {
+		log.Printf("new genai client error %v\n", err)
+		c.JSON(http.StatusBadRequest, openai.APIError{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+	defer client.Close()
+
+	var gemini adapter.GenaiModelAdapter
+	switch req.Model {
+	case openai.GPT4VisionPreview:
+		gemini = adapter.NewGeminiProVisionAdapter(client)
+	default:
+		gemini = adapter.NewGeminiProAdapter(client)
+	}
+
+	if !req.Stream {
+		resp, err := gemini.GenerateContent(ctx, req)
+		if err != nil {
+			log.Printf("genai generate content error %v\n", err)
+			c.JSON(http.StatusBadRequest, openai.APIError{
+				Code:    http.StatusBadRequest,
+				Message: err.Error(),
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, resp)
+		return
+	}
+
+	dataChan, err := gemini.GenerateStreamContent(ctx, req)
+	if err != nil {
+		log.Printf("genai generate content error %v\n", err)
+		c.JSON(http.StatusBadRequest, openai.APIError{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	setEventStreamHeaders(c)
+	c.Stream(func(w io.Writer) bool {
+		if data, ok := <-dataChan; ok {
+			c.Render(-1, adapter.Event{Data: "data: " + data})
+			return true
+		}
+		c.Render(-1, adapter.Event{Data: "data: [DONE]"})
+		return false
+	})
+}
+
+func setEventStreamHeaders(c *gin.Context) {
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
+	c.Writer.Header().Set("Transfer-Encoding", "chunked")
+	c.Writer.Header().Set("X-Accel-Buffering", "no")
 }
 
 func getRandomAPIKey() (string, error) {
@@ -213,117 +300,4 @@ func VisionProxyHandler(c *gin.Context) {
 		c.Render(-1, protocol.Event{Data: "data: [DONE]"})
 		return false
 	})
-}
-
-func ChatProxyHandler(c *gin.Context) {
-	openaiAPIKey, err := getRandomAPIKey()
-	if err != nil {
-		// Handle the error, for example, log it and return from the function
-		log.Printf("Error getting API key: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve API key from gemini-api-key.json file"})
-		return
-	}
-
-	println("use api key:" + openaiAPIKey)
-
-	if openaiAPIKey == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Api key not found!"})
-		return
-	}
-
-	var req openai.ChatCompletionRequest
-	// Bind the JSON data from the request to the struct
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	if len(req.Messages) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "request message must not be empty!"})
-		return
-	}
-
-	ctx := c.Request.Context()
-	client, err := genai.NewClient(ctx, option.WithAPIKey(openaiAPIKey))
-	if err != nil {
-		log.Printf("new genai client error %v\n", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	defer client.Close()
-
-	model := client.GenerativeModel(protocol.GeminiPro)
-	protocol.SetGenaiModelByOpenaiRequest(model, req)
-
-	cs := model.StartChat()
-	protocol.SetGenaiChatByOpenaiRequest(cs, req)
-
-	prompt := genai.Text(req.Messages[len(req.Messages)-1].Content)
-
-	if !req.Stream {
-		genaiResp, err := cs.SendMessage(ctx, prompt)
-		if err != nil {
-			log.Printf("genai send message error %v\n", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-
-		openaiResp := protocol.GenaiResponseToOpenaiResponse(genaiResp)
-		c.JSON(http.StatusOK, openaiResp)
-		return
-	}
-
-	iter := cs.SendMessageStream(ctx, prompt)
-	dataChan := make(chan string)
-	go func() {
-		defer close(dataChan)
-
-		defer func() {
-			if r := recover(); r != nil {
-				log.Println("Recovered. Error:\n", r)
-			}
-		}()
-
-		respID := util.GetUUID()
-		created := time.Now().Unix()
-
-		for {
-			genaiResp, err := iter.Next()
-			if err == iterator.Done {
-				break
-			}
-
-			if err != nil {
-				log.Printf("genai get stream message error %v\n", err)
-				dataChan <- fmt.Sprintf(`{"error": "%s"}`, err.Error())
-				break
-			}
-
-			openaiResp := protocol.GenaiResponseToStreamCompletionResponse(genaiResp, respID, created)
-			resp, _ := json.Marshal(openaiResp)
-			dataChan <- string(resp)
-
-			if len(openaiResp.Choices) > 0 && openaiResp.Choices[0].FinishReason != nil {
-				break
-			}
-		}
-	}()
-
-	setEventStreamHeaders(c)
-	c.Stream(func(w io.Writer) bool {
-		if data, ok := <-dataChan; ok {
-			c.Render(-1, protocol.Event{Data: "data: " + data})
-			return true
-		}
-		c.Render(-1, protocol.Event{Data: "data: [DONE]"})
-		return false
-	})
-}
-
-func setEventStreamHeaders(c *gin.Context) {
-	c.Writer.Header().Set("Content-Type", "text/event-stream")
-	c.Writer.Header().Set("Cache-Control", "no-cache")
-	c.Writer.Header().Set("Connection", "keep-alive")
-	c.Writer.Header().Set("Transfer-Encoding", "chunked")
-	c.Writer.Header().Set("X-Accel-Buffering", "no")
 }

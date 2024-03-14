@@ -110,17 +110,6 @@ func nightmare(c *gin.Context) {
 		return
 	}
 
-	// err := c.BindJSON(&original_request)
-	// if err != nil {
-	// 	c.JSON(400, gin.H{"error": gin.H{
-	// 		"message": "Request must be proper JSON",
-	// 		"type":    "invalid_request_error",
-	// 		"param":   nil,
-	// 		"code":    err.Error(),
-	// 	}})
-	// 	return
-	// }
-
 	c.Request.Body = io.NopCloser(bytes.NewReader(buff.Bytes()))
 	if original_request.Model == "gemini-pro" {
 		api.ChatProxyHandler(c)
