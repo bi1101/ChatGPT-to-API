@@ -15,6 +15,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.1
 	github.com/joho/godotenv v1.5.1
+	github.com/pkg/errors v0.9.1
 	github.com/sashabaranov/go-openai v1.20.3
 	github.com/tidwall/gjson v1.14.4
 	github.com/xqdoo00o/OpenAIAuth v0.0.0-20240313154058-7c1d960f325b
