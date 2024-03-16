@@ -15,8 +15,6 @@ import (
 	"sync"
 	"time"
 
-	hp "net/http"
-
 	"github.com/gorilla/websocket"
 
 	http "github.com/bogdanfinn/fhttp"
@@ -76,14 +74,10 @@ func getWSURL(token string, retry int) (string, error) {
 }
 
 func createWSConn(url string, connInfo *connInfo, retry int) error {
-	header := make(hp.Header)
-	header.Add("Sec-WebSocket-Protocol", "json.reliable.webpubsub.azure.v1")
-	dialer := websocket.Dialer{
-		Proxy:             hp.ProxyFromEnvironment,
-		HandshakeTimeout:  45 * time.Second,
-		EnableCompression: true,
-	}
-	conn, _, err := dialer.Dial(url, header)
+	dialer := websocket.DefaultDialer
+	dialer.EnableCompression = true
+	dialer.Subprotocols = []string{"json.reliable.webpubsub.azure.v1"}
+	conn, _, err := dialer.Dial(url, nil)
 	if err != nil {
 		if retry > 3 {
 			return err
@@ -234,6 +228,7 @@ func CheckRequire(access_token string, puid string, proxy string) *ChatRequire {
 	}
 	return &require
 }
+
 func POSTconversation(message chatgpt_types.ChatGPTRequest, access_token string, puid string, chat_token string, proxy string) (*http.Response, error) {
 	if proxy != "" {
 		client.SetProxy(proxy)
@@ -379,6 +374,8 @@ func Handler(c *gin.Context, response *http.Response, token string, puid string,
 	var wssUrl string
 	var connInfo *connInfo
 	var wsSeq int
+	var isWSInterrupt bool = false
+	var interruptTimer *time.Timer
 
 	if !strings.Contains(response.Header.Get("Content-Type"), "text/event-stream") {
 		isWSS = true
@@ -399,9 +396,21 @@ func Handler(c *gin.Context, response *http.Response, token string, puid string,
 		if isWSS {
 			var messageType int
 			var message []byte
+			if isWSInterrupt {
+				if interruptTimer == nil {
+					interruptTimer = time.NewTimer(10 * time.Second)
+				}
+				select {
+				case <-interruptTimer.C:
+					c.JSON(500, gin.H{"error": "WS interrupt & new WS timeout"})
+					return "", nil
+				default:
+					goto reader
+				}
+			}
+		reader:
 			messageType, message, err = connInfo.conn.ReadMessage()
 			if err != nil {
-				println(err.Error())
 				connInfo.ticker.Stop()
 				connInfo.conn.Close()
 				connInfo.conn = nil
@@ -410,6 +419,7 @@ func Handler(c *gin.Context, response *http.Response, token string, puid string,
 					c.JSON(500, gin.H{"error": err.Error()})
 					return "", nil
 				}
+				isWSInterrupt = true
 				connInfo.conn.WriteMessage(websocket.TextMessage, []byte("{\"type\":\"sequenceAck\",\"sequenceId\":"+strconv.Itoa(wsSeq)+"}"))
 				continue
 			}
@@ -427,6 +437,10 @@ func Handler(c *gin.Context, response *http.Response, token string, puid string,
 				bodyByte, err := base64.StdEncoding.DecodeString(base64Body)
 				if err != nil {
 					continue
+				}
+				if isWSInterrupt {
+					isWSInterrupt = false
+					interruptTimer.Stop()
 				}
 				line = string(bodyByte)
 			}
