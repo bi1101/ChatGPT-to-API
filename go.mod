@@ -18,7 +18,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/sashabaranov/go-openai v1.20.3
 	github.com/tidwall/gjson v1.14.4
-	github.com/xqdoo00o/OpenAIAuth v0.0.0-20240313154058-7c1d960f325b
+	github.com/xqdoo00o/OpenAIAuth v0.0.0-20240320132013-15a383f3e0fd
 	github.com/xqdoo00o/funcaptcha v0.0.0-20240313153914-4ab805804232
 	github.com/zhu327/gemini-openai-proxy v0.0.0-20240314045503-f6afa6badbd2
 	google.golang.org/api v0.169.0
