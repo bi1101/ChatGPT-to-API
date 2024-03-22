@@ -25,6 +25,10 @@ require (
 )
 
 require (
+	cloud.google.com/go/ai v0.3.2 // indirect
+	cloud.google.com/go/compute v1.24.0 // indirect
+	cloud.google.com/go/compute/metadata v0.2.3 // indirect
+	cloud.google.com/go/longrunning v0.5.5 // indirect
 	github.com/andybalholm/brotli v1.0.5 // indirect
 	github.com/bogdanfinn/utls v1.5.16 // indirect
 	github.com/bytedance/sonic v1.11.2 // indirect
