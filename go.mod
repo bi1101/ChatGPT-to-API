@@ -17,7 +17,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/sashabaranov/go-openai v1.20.3
 	github.com/tidwall/gjson v1.14.4
-	github.com/xqdoo00o/OpenAIAuth v0.0.0-20240320132013-15a383f3e0fd
+	github.com/xqdoo00o/OpenAIAuth v0.0.0-20240320160511-93065690aa0e
 	github.com/xqdoo00o/funcaptcha v0.0.0-20240313153914-4ab805804232
 	github.com/zhu327/gemini-openai-proxy v0.0.0-20240314045503-f6afa6badbd2
 	google.golang.org/api v0.169.0
@@ -25,13 +25,7 @@ require (
 )
 
 require (
-	cloud.google.com/go/ai v0.3.2 // indirect
-	cloud.google.com/go/compute v1.24.0 // indirect
-	cloud.google.com/go/compute/metadata v0.2.3 // indirect
-	cloud.google.com/go/longrunning v0.5.5 // indirect
-	github.com/PuerkitoBio/goquery v1.8.1 // indirect
 	github.com/andybalholm/brotli v1.0.5 // indirect
-	github.com/andybalholm/cascadia v1.3.2 // indirect
 	github.com/bogdanfinn/utls v1.5.16 // indirect
 	github.com/bytedance/sonic v1.11.2 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20230717121745-296ad89f973d // indirect
