@@ -9,9 +9,12 @@ import (
 	arkose "github.com/xqdoo00o/funcaptcha"
 )
 
-func ConvertAPIRequest(api_request official_types.APIRequest, puid string, requireArk bool, proxy string) chatgpt_types.ChatGPTRequest {
+func ConvertAPIRequest(api_request official_types.APIRequest, puid string, requireArk bool, dx string, proxy string) chatgpt_types.ChatGPTRequest {
 	chatgpt_request := chatgpt_types.NewChatGPTRequest()
 	var api_version int
+	if puid == "" {
+		api_request.Model = "gpt-3.5"
+	}
 	if strings.HasPrefix(api_request.Model, "gpt-3.5") {
 		api_version = 3
 		chatgpt_request.Model = "text-davinci-002-render-sha"
@@ -24,7 +27,7 @@ func ConvertAPIRequest(api_request official_types.APIRequest, puid string, requi
 		}
 	}
 	if requireArk {
-		token, err := arkose.GetOpenAIToken(api_version, puid, proxy)
+		token, err := arkose.GetOpenAIToken(api_version, puid, dx, proxy)
 		if err == nil {
 			chatgpt_request.ArkoseToken = token
 		} else {
@@ -44,14 +47,14 @@ func ConvertAPIRequest(api_request official_types.APIRequest, puid string, requi
 	return chatgpt_request
 }
 
-func RenewTokenForRequest(request *chatgpt_types.ChatGPTRequest, puid string, proxy string) {
+func RenewTokenForRequest(request *chatgpt_types.ChatGPTRequest, puid string, dx string, proxy string) {
 	var api_version int
 	if strings.HasPrefix(request.Model, "gpt-4") {
 		api_version = 4
 	} else {
 		api_version = 3
 	}
-	token, err := arkose.GetOpenAIToken(api_version, puid, proxy)
+	token, err := arkose.GetOpenAIToken(api_version, puid, dx, proxy)
 	if err == nil {
 		request.ArkoseToken = token
 	} else {
