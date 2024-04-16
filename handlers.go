@@ -126,7 +126,7 @@ func nightmare(c *gin.Context) {
 	}
 
 	if original_request.Model == "gemini-pro-vision" {
-		api.VisionProxyHandler(c)
+		api.ChatProxyHandler(c)
 		return
 	}
 
