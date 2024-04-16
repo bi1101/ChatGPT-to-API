@@ -7,6 +7,8 @@
     
 ### 设置
 
+#### 自2024-04-02起，可选配置accounts.txt，因为gpt-3.5无需登录了。
+
 配置账户邮箱和密码，自动生成和更新Access tokens 和 PUID（仅PLUS账户）（使用[OpenAIAuth](https://github.com/xqdoo00o/OpenAIAuth/)）
 
 `accounts.txt` - 存放OpenAI账号邮箱和密码的文件
@@ -20,7 +22,7 @@
 
 所有登录后的Access tokens和PUID会存放在`access_tokens.json`
 
-每7天自动更新Access tokens和PUID
+每天自动更新Access tokens和PUID
 
 注意！ 请使用未封锁的ip登录账号，请先打开浏览器登录`https://chat.openai.com/`以检查ip是否可用
 
