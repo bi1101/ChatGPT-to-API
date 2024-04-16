@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 
+	chatgpt_types "freechatgpt/typings/chatgpt"
+
 	"github.com/acheong08/endless"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -63,6 +65,7 @@ func init() {
 	scheduleTokenPUID()
 }
 func main() {
+	defer chatgpt_types.SaveFileHash()
 	router := gin.Default()
 
 	router.Use(cors)

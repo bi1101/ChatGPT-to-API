@@ -11,6 +11,8 @@ Create a fake API using ChatGPT's website
     
 ### Authentication
 
+#### After 2024-04-02, accouts.txt is optional because no need authentication for gpt-3.5.
+
 Access token and PUID(only for PLUS account) retrieval has been automated by [OpenAIAuth](https://github.com/xqdoo00o/OpenAIAuth/) with account email & password.
 
 `accounts.txt` - A list of accounts separated by new line 
@@ -23,7 +25,7 @@ email:password
 
 All authenticated access tokens and PUID will store in `access_tokens.json`
 
-Auto renew access tokens and PUID after 7 days
+Auto renew access tokens and PUID after 1 day
 
 Caution! please use unblocked ip for authentication, first login to `https://chat.openai.com/` to check ip availability if you can.
 
