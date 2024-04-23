@@ -15,6 +15,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"time"
 
 	// 确保导入以下包以支持常见的图像格式
 	_ "image/gif"
@@ -58,15 +59,19 @@ type Original_multimodel struct {
 	Image Image_url `json:"image_url,omitempty"`
 }
 
+type ChatGPTConvMode struct {
+	Kind    string `json:"kind"`
+	GizmoId string `json:"gizmo_id,omitempty"`
+}
 type ChatGPTRequest struct {
 	Action                     string            `json:"action"`
+	ConversationMode           ChatGPTConvMode   `json:"conversation_mode"`
 	Messages                   []chatgpt_message `json:"messages,omitempty"`
 	ParentMessageID            string            `json:"parent_message_id,omitempty"`
 	ConversationID             string            `json:"conversation_id,omitempty"`
 	Model                      string            `json:"model"`
 	HistoryAndTrainingDisabled bool              `json:"history_and_training_disabled"`
 	ArkoseToken                string            `json:"arkose_token,omitempty"`
-	PluginIDs                  []string          `json:"plugin_ids,omitempty"`
 }
 type FileResp struct {
 	File_id    string `json:"file_id"`
@@ -85,6 +90,8 @@ type FileResult struct {
 	Filesize int
 	Isimage  bool
 	Bounds   [2]int
+	// Current file max-age 1 year
+	Upload int64
 }
 
 type ImgPart struct {
@@ -222,8 +229,31 @@ func NewChatGPTRequest() ChatGPTRequest {
 		ParentMessageID:            uuid.NewString(),
 		Model:                      "text-davinci-002-render-sha",
 		HistoryAndTrainingDisabled: disable_history,
+		ConversationMode:           ChatGPTConvMode{Kind: "primary_assistant"},
 	}
 }
+
+func newRequest(method string, url string, body io.Reader, secret *tokens.Secret, deviceId string) (*http.Request, error) {
+	request, err := http.NewRequest(method, url, body)
+	if err != nil {
+		return &http.Request{}, err
+	}
+	request.Header.Set("User-Agent", userAgent)
+	request.Header.Set("Accept", "*/*")
+	request.Header.Set("Oai-Device-Id", deviceId)
+	request.Header.Set("Oai-Language", "en-US")
+	if secret.Token != "" {
+		request.Header.Set("Authorization", "Bearer "+secret.Token)
+	}
+	if secret.PUID != "" {
+		request.Header.Set("Cookie", "_puid="+secret.PUID+";")
+	}
+	if secret.TeamUserID != "" {
+		request.Header.Set("Chatgpt-Account-Id", secret.TeamUserID)
+	}
+	return request, nil
+}
+
 func processUrl(urlstr string, account string, secret *tokens.Secret, deviceId string, proxy string) *FileResult {
 	if proxy != "" {
 		client.SetProxy(proxy)
@@ -250,8 +280,8 @@ func processUrl(urlstr string, account string, secret *tokens.Secret, deviceId s
 	}
 	hasher := sha1.New()
 	hasher.Write(binary)
-	hash := account + hex.EncodeToString(hasher.Sum(nil))
-	if fileHashPool[hash] != nil {
+	hash := account + secret.TeamUserID + hex.EncodeToString(hasher.Sum(nil))
+	if fileHashPool[hash] != nil && time.Now().Unix() < fileHashPool[hash].Upload+31536000 {
 		return fileHashPool[hash]
 	}
 	isImg := strings.HasPrefix(mimeType, "image")
@@ -267,7 +297,7 @@ func processUrl(urlstr string, account string, secret *tokens.Secret, deviceId s
 	if fileid == "" {
 		return nil
 	} else {
-		result := FileResult{Mime: mimeType, Filename: fileName, Filesize: len(binary), Fileid: fileid, Isimage: isImg, Bounds: bounds}
+		result := FileResult{Mime: mimeType, Filename: fileName, Filesize: len(binary), Fileid: fileid, Isimage: isImg, Bounds: bounds, Upload: time.Now().Unix()}
 		fileHashPool[hash] = &result
 		return &result
 	}
@@ -280,8 +310,8 @@ func processDataUrl(data string, account string, secret *tokens.Secret, deviceId
 	}
 	hasher := sha1.New()
 	hasher.Write(binary)
-	hash := account + hex.EncodeToString(hasher.Sum(nil))
-	if fileHashPool[hash] != nil {
+	hash := account + secret.TeamUserID + hex.EncodeToString(hasher.Sum(nil))
+	if fileHashPool[hash] != nil && time.Now().Unix() < fileHashPool[hash].Upload+31536000 {
 		return fileHashPool[hash]
 	}
 	startIdx := strings.Index(data, ":")
@@ -308,7 +338,7 @@ func processDataUrl(data string, account string, secret *tokens.Secret, deviceId
 	if fileid == "" {
 		return nil
 	} else {
-		result := FileResult{Mime: mimeType, Filename: fileName, Filesize: len(binary), Fileid: fileid, Isimage: isImg, Bounds: bounds}
+		result := FileResult{Mime: mimeType, Filename: fileName, Filesize: len(binary), Fileid: fileid, Isimage: isImg, Bounds: bounds, Upload: time.Now().Unix()}
 		fileHashPool[hash] = &result
 		return &result
 	}
@@ -324,17 +354,7 @@ func uploadBinary(data []byte, mime string, name string, isImg bool, secret *tok
 		fileCase = "ace_upload"
 	}
 	dataLen := strconv.Itoa(len(data))
-	request, err := http.NewRequest(http.MethodPost, "https://chat.openai.com/backend-api/files", bytes.NewBuffer([]byte(`{"file_name":"`+name+`","file_size":`+dataLen+`,"use_case":"`+fileCase+`"}`)))
-	if secret.PUID != "" {
-		request.Header.Set("Cookie", "_puid="+secret.PUID+";")
-	}
-	if secret.Token != "" {
-		request.Header.Set("Authorization", "Bearer "+secret.Token)
-	}
-	request.Header.Set("User-Agent", userAgent)
-	request.Header.Set("Accept", "*/*")
-	request.Header.Set("Oai-Device-Id", deviceId)
-	request.Header.Set("Oai-Language", "en-US")
+	request, err := newRequest(http.MethodPost, "https://chat.openai.com/backend-api/files", bytes.NewBuffer([]byte(`{"file_name":"`+name+`","file_size":`+dataLen+`,"use_case":"`+fileCase+`"}`)), secret, deviceId)
 	if err != nil {
 		return ""
 	}
@@ -365,17 +385,7 @@ func uploadBinary(data []byte, mime string, name string, isImg bool, secret *tok
 	if response.StatusCode != 201 {
 		return ""
 	}
-	request, err = http.NewRequest(http.MethodPost, "https://chat.openai.com/backend-api/files/"+fileResp.File_id+"/uploaded", bytes.NewBuffer([]byte(`{}`)))
-	if secret.PUID != "" {
-		request.Header.Set("Cookie", "_puid="+secret.PUID+";")
-	}
-	if secret.Token != "" {
-		request.Header.Set("Authorization", "Bearer "+secret.Token)
-	}
-	request.Header.Set("User-Agent", userAgent)
-	request.Header.Set("Accept", "*/*")
-	request.Header.Set("Oai-Device-Id", deviceId)
-	request.Header.Set("Oai-Language", "en-US")
+	request, err = newRequest(http.MethodPost, "https://chat.openai.com/backend-api/files/"+fileResp.File_id+"/uploaded", bytes.NewBuffer([]byte(`{}`)), secret, deviceId)
 	if err != nil {
 		return ""
 	}

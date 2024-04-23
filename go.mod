@@ -17,9 +17,10 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/sashabaranov/go-openai v1.21.0
 	github.com/tidwall/gjson v1.17.1
-	github.com/xqdoo00o/OpenAIAuth v0.0.0-20240403091529-7ef147706fc4
+	github.com/xqdoo00o/OpenAIAuth v0.0.0-20240420184134-706a5d60f6c1
 	github.com/xqdoo00o/funcaptcha v0.0.0-20240403090732-1b604d808f6c
 	github.com/zhu327/gemini-openai-proxy v0.0.0-20240328042054-d2c6c4cdff01
+	golang.org/x/crypto v0.22.0
 	golang.org/x/image v0.15.0
 	google.golang.org/api v0.172.0
 	k8s.io/apimachinery v0.29.3
@@ -74,7 +75,6 @@ require (
 	go.opentelemetry.io/otel/metric v1.25.0 // indirect
 	go.opentelemetry.io/otel/trace v1.25.0 // indirect
 	golang.org/x/arch v0.7.0 // indirect
-	golang.org/x/crypto v0.22.0 // indirect
 	golang.org/x/exp v0.0.0-20240409090435-93d18d7e34b8 // indirect
 	golang.org/x/net v0.24.0 // indirect
 	golang.org/x/oauth2 v0.19.0 // indirect
