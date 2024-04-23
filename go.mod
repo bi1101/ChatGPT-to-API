@@ -19,8 +19,8 @@ require (
 	github.com/tidwall/gjson v1.17.1
 	github.com/xqdoo00o/OpenAIAuth v0.0.0-20240420184134-706a5d60f6c1
 	github.com/xqdoo00o/funcaptcha v0.0.0-20240403090732-1b604d808f6c
-	golang.org/x/crypto v0.22.0
 	github.com/zhu327/gemini-openai-proxy v0.0.0-20240328042054-d2c6c4cdff01
+	golang.org/x/crypto v0.22.0
 	golang.org/x/image v0.15.0
 	google.golang.org/api v0.172.0
 	k8s.io/apimachinery v0.29.3
