@@ -5,6 +5,7 @@ go 1.21.1
 toolchain go1.22.0
 
 require (
+	github.com/PuerkitoBio/goquery v1.9.1
 	github.com/acheong08/endless v0.0.0-20230615162514-90545c7793fd
 	github.com/bogdanfinn/fhttp v0.5.28
 	github.com/bogdanfinn/tls-client v1.7.4
@@ -17,7 +18,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/sashabaranov/go-openai v1.21.0
 	github.com/tidwall/gjson v1.17.1
-	github.com/xqdoo00o/OpenAIAuth v0.0.0-20240420184134-706a5d60f6c1
+	github.com/xqdoo00o/OpenAIAuth v0.0.0-20240425072142-e599e4049d02
 	github.com/xqdoo00o/funcaptcha v0.0.0-20240403090732-1b604d808f6c
 	github.com/zhu327/gemini-openai-proxy v0.0.0-20240328042054-d2c6c4cdff01
 	golang.org/x/crypto v0.22.0
@@ -32,6 +33,7 @@ require (
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	cloud.google.com/go/longrunning v0.5.6 // indirect
 	github.com/andybalholm/brotli v1.1.0 // indirect
+	github.com/andybalholm/cascadia v1.3.2 // indirect
 	github.com/bogdanfinn/utls v1.6.1 // indirect
 	github.com/bytedance/sonic v1.11.3 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20230717121745-296ad89f973d // indirect
