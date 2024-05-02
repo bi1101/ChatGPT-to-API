@@ -13,7 +13,6 @@ import (
 	"io"
 	"math/rand"
 	"net"
-	"net"
 	"net/url"
 	"os"
 	"strconv"
@@ -546,7 +545,7 @@ func Handler(c *gin.Context, response *http.Response, secret *tokens.Secret, pro
 	var isWSS = false
 	var convId string
 	var respId string
-	//var wssUrl string
+	var wssUrl string
 	var connInfo *connInfo
 	var wsSeq int
 	var isWSInterrupt bool = false
@@ -561,24 +560,14 @@ func Handler(c *gin.Context, response *http.Response, secret *tokens.Secret, pro
 		}
 		var wssResponse chatgpt_types.ChatGPTWSSResponse
 		json.NewDecoder(response.Body).Decode(&wssResponse)
-		//wssUrl = wssResponse.WssUrl
+		wssUrl = wssResponse.WssUrl
 		respId = wssResponse.ResponseId
 		convId = wssResponse.ConversationId
 	}
-
-	const readTimeout = 2 * time.Second
 	for {
 		var line string
 		var err error
 		if isWSS {
-			//println("Reading message from WebSocket")
-			if connInfo.conn != nil {
-				connInfo.conn.SetReadDeadline(time.Now().Add(readTimeout))
-			} else {
-				// If the connection is nil, respond with an error immediately
-				c.JSON(500, gin.H{"error": "WebSocket connection is closed or not initialized"})
-				return "", nil
-			}
 			var messageType int
 			var message []byte
 			if isWSInterrupt {
@@ -601,21 +590,12 @@ func Handler(c *gin.Context, response *http.Response, secret *tokens.Secret, pro
 				connInfo.conn = nil
 				err := createWSConn(wssUrl, connInfo, proxy, 0)
 				if err != nil {
-				if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-					println("Read timeout:", err.Error())
-					connInfo.ticker.Stop()
-					connInfo.conn.Close()
-					connInfo.conn = nil
-					c.JSON(500, gin.H{"error": "WebSocket read took too long"})
-				} else {
-					println(err.Error())
-					connInfo.ticker.Stop()
-					connInfo.conn.Close()
-					connInfo.conn = nil
 					c.JSON(500, gin.H{"error": err.Error()})
 					return "", nil
 				}
 				isWSInterrupt = true
+				connInfo.conn.WriteMessage(websocket.TextMessage, []byte("{\"type\":\"sequenceAck\",\"sequenceId\":"+strconv.Itoa(wsSeq)+"}"))
+				continue
 			}
 			if messageType == websocket.TextMessage {
 				var wssMsgResponse chatgpt_types.WSSMsgResponse
