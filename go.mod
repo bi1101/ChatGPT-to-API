@@ -10,7 +10,6 @@ require (
 	github.com/bogdanfinn/fhttp v0.5.28
 	github.com/bogdanfinn/tls-client v1.7.5
 	github.com/bogdanfinn/utls v1.6.1
-	github.com/bogdanfinn/tls-client v1.7.4
 	github.com/gin-contrib/cors v1.7.1
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-resty/resty/v2 v2.12.0
@@ -84,8 +83,8 @@ require (
 	golang.org/x/sync v0.7.0 // indirect
 	golang.org/x/sys v0.19.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
-	golang.org/x/tools v0.20.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
+	golang.org/x/tools v0.20.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240415180920-8c6c420018be // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240415180920-8c6c420018be // indirect
 	google.golang.org/grpc v1.63.2 // indirect
