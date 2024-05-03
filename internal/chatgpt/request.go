@@ -609,7 +609,6 @@ func Handler(c *gin.Context, response *http.Response, secret *tokens.Secret, pro
 					return "", nil
 				}
 				isWSInterrupt = true
-				connInfo.conn.WriteMessage(websocket.TextMessage, []byte("{\"type\":\"sequenceAck\",\"sequenceId\":"+strconv.Itoa(wsSeq)+"}"))
 				continue
 			}
 			if messageType == websocket.TextMessage {
