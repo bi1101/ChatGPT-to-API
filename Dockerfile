@@ -10,6 +10,10 @@ WORKDIR /tls
 # Set the working directory
 WORKDIR /app
 
+# update CA certificates
+RUN apk update && apk upgrade && apk add --no-cache ca-certificates
+RUN update-ca-certificates
+
 # Copy the Go Modules manifests (go.mod and go.sum files)
 COPY go.mod go.sum ./
 
