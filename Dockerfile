@@ -32,7 +32,8 @@ FROM scratch
 # Set the working directory
 WORKDIR /app
 
-COPY ./ca-certificates.crt /etc/ssl/certs/
+# Copy CA certificates from the builder stage
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 # Copy the built Go binary from the builder stage
 COPY --from=builder /app/ChatGPT-To-API /app/ChatGPT-To-API
