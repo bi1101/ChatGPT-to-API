@@ -71,8 +71,8 @@ type ChatGPTRequest struct {
 	ConversationID             string            `json:"conversation_id,omitempty"`
 	Model                      string            `json:"model"`
 	HistoryAndTrainingDisabled bool              `json:"history_and_training_disabled"`
-	ArkoseToken                string            `json:"arkose_token,omitempty"`
 	WebsocketRequestId         string            `json:"websocket_request_id"`
+	ForceSSE                   bool              `json:"force_use_sse"`
 }
 type FileResp struct {
 	File_id    string `json:"file_id"`
@@ -91,7 +91,7 @@ type FileResult struct {
 	Filesize int
 	Isimage  bool
 	Bounds   [2]int
-	// Current file max-age 1 year
+	// Current file max-age 30 days
 	Upload int64
 }
 
@@ -237,6 +237,7 @@ func NewChatGPTRequest() ChatGPTRequest {
 		HistoryAndTrainingDisabled: disable_history,
 		ConversationMode:           ChatGPTConvMode{Kind: "primary_assistant"},
 		WebsocketRequestId:         uuid.NewString(),
+		ForceSSE:                   true,
 	}
 }
 
@@ -288,7 +289,7 @@ func processUrl(urlstr string, account string, secret *tokens.Secret, deviceId s
 	hasher := sha1.New()
 	hasher.Write(binary)
 	hash := account + secret.TeamUserID + hex.EncodeToString(hasher.Sum(nil))
-	if fileHashPool[hash] != nil && time.Now().Unix() < fileHashPool[hash].Upload+31536000 {
+	if fileHashPool[hash] != nil && time.Now().Unix() < fileHashPool[hash].Upload+2592000 {
 		return fileHashPool[hash]
 	}
 	isImg := strings.HasPrefix(mimeType, "image")
@@ -318,7 +319,7 @@ func processDataUrl(data string, account string, secret *tokens.Secret, deviceId
 	hasher := sha1.New()
 	hasher.Write(binary)
 	hash := account + secret.TeamUserID + hex.EncodeToString(hasher.Sum(nil))
-	if fileHashPool[hash] != nil && time.Now().Unix() < fileHashPool[hash].Upload+31536000 {
+	if fileHashPool[hash] != nil && time.Now().Unix() < fileHashPool[hash].Upload+2592000 {
 		return fileHashPool[hash]
 	}
 	startIdx := strings.Index(data, ":")
@@ -467,6 +468,16 @@ func (c *ChatGPTRequest) AddMessage(role string, content interface{}, multimodal
 			msg.Content.ContentType = "multimodal_text"
 		}
 		msg.Metadata = &Chatgpt_metadata{Attachments: []ImgMeta{{Id: result.Fileid, Name: result.Filename, Size: result.Filesize, MimeType: result.Mime, Width: result.Bounds[0], Height: result.Bounds[1]}}}
+	}
+	c.Messages = append(c.Messages, msg)
+}
+
+func (c *ChatGPTRequest) AddAssistantMessage(input string) {
+	var msg = chatgpt_message{
+		ID:       uuid.New(),
+		Author:   chatgpt_author{Role: "assistant"},
+		Content:  chatgpt_content{ContentType: "text", Parts: []interface{}{input}},
+		Metadata: nil,
 	}
 	c.Messages = append(c.Messages, msg)
 }

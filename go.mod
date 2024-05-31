@@ -19,7 +19,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/sashabaranov/go-openai v1.24.0
 	github.com/tidwall/gjson v1.17.1
-	github.com/xqdoo00o/OpenAIAuth v0.0.0-20240507071909-7f24aae29d9e
+	github.com/xqdoo00o/OpenAIAuth v0.0.0-20240520071626-7f9e463abed0
 	github.com/xqdoo00o/funcaptcha v0.0.0-20240507071758-6c32cfc34bdc
 	github.com/zhu327/gemini-openai-proxy v0.0.0-20240516031111-9277c7e72421
 	golang.org/x/crypto v0.23.0

@@ -8,15 +8,13 @@ import (
 	"freechatgpt/internal/gemini/api"
 	"freechatgpt/internal/tokens"
 	official_types "freechatgpt/typings/official"
-	"os"
-	"strings"
-
 	"io"
 	"net/http"
-	"sync"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	arkose "github.com/xqdoo00o/funcaptcha"
 )
 
 var (
@@ -130,16 +128,7 @@ func nightmare(c *gin.Context) {
 		return
 	}
 
-	authHeader := c.GetHeader("Authorization")
 	account, secret := getSecret()
-	if authHeader != "" {
-		customAccessToken := strings.Replace(authHeader, "Bearer ", "", 1)
-		// Check if customAccessToken starts with sk-
-		if strings.HasPrefix(customAccessToken, "eyJhbGciOiJSUzI1NiI") {
-			secret.Token = customAccessToken
-		}
-	}
-
 	var proxy_url string
 	if len(proxies) == 0 {
 		proxy_url = ""
@@ -152,32 +141,12 @@ func nightmare(c *gin.Context) {
 	var deviceId string
 	if account == "" {
 		deviceId = uid
-		chatgpt.SetOAICookie(uid)
+		chatgpt.SetOAICookie(deviceId)
 	} else {
 		deviceId = generateUUID(account)
 		chatgpt.SetOAICookie(deviceId)
 	}
-	var err error
-	var chat_require *chatgpt.ChatRequire
-	var wg sync.WaitGroup
-	if secret.Token == "" {
-		wg.Add(1)
-	} else {
-		wg.Add(2)
-		go func() {
-			defer wg.Done()
-			err = chatgpt.InitWSConn(&secret, deviceId, uid, proxy_url)
-		}()
-	}
-	go func() {
-		defer wg.Done()
-		chat_require = chatgpt.CheckRequire(&secret, deviceId, proxy_url)
-	}()
-	wg.Wait()
-	if err != nil {
-		c.JSON(500, gin.H{"error": "unable to create ws tunnel"})
-		return
-	}
+	chat_require := chatgpt.CheckRequire(&secret, deviceId, proxy_url)
 	if chat_require == nil {
 		c.JSON(500, gin.H{"error": "unable to check chat requirement"})
 		return
@@ -186,10 +155,17 @@ func nightmare(c *gin.Context) {
 	if chat_require.Proof.Required {
 		proofToken = chatgpt.CalcProofToken(chat_require, proxy_url)
 	}
+	var arkoseToken string
+	if chat_require.Arkose.Required {
+		arkoseToken, err = arkose.GetOpenAIToken(4, secret.PUID, chat_require.Arkose.DX, proxy_url)
+		if err != nil {
+			println("Error getting Arkose token: ", err)
+		}
+	}
 	// Convert the chat request to a ChatGPT request
-	translated_request := chatgpt_request_converter.ConvertAPIRequest(original_request, account, &secret, deviceId, chat_require.Arkose.Required, chat_require.Arkose.DX, proxy_url)
+	translated_request := chatgpt_request_converter.ConvertAPIRequest(original_request, account, &secret, deviceId, proxy_url)
 
-	response, err := chatgpt.POSTconversation(translated_request, &secret, deviceId, chat_require.Token, proofToken, proxy_url)
+	response, err := chatgpt.POSTconversation(translated_request, &secret, deviceId, chat_require.Token, arkoseToken, proofToken, proxy_url)
 	if err != nil {
 		c.JSON(500, gin.H{
 			"error": "error sending request",
@@ -219,9 +195,12 @@ func nightmare(c *gin.Context) {
 			proofToken = chatgpt.CalcProofToken(chat_require, proxy_url)
 		}
 		if chat_require.Arkose.Required {
-			chatgpt_request_converter.RenewTokenForRequest(&translated_request, secret.PUID, chat_require.Arkose.DX, proxy_url)
+			arkoseToken, err = arkose.GetOpenAIToken(4, secret.PUID, chat_require.Arkose.DX, proxy_url)
+			if err != nil {
+				println("Error getting Arkose token: ", err)
+			}
 		}
-		response, err = chatgpt.POSTconversation(translated_request, &secret, deviceId, chat_require.Token, proofToken, proxy_url)
+		response, err = chatgpt.POSTconversation(translated_request, &secret, deviceId, chat_require.Token, arkoseToken, proofToken, proxy_url)
 		if err != nil {
 			c.JSON(500, gin.H{
 				"error": "error sending request",
@@ -241,5 +220,103 @@ func nightmare(c *gin.Context) {
 	} else {
 		c.String(200, "data: [DONE]\n\n")
 	}
-	chatgpt.UnlockSpecConn(secret.Token+secret.TeamUserID, uid)
+}
+
+var ttsFmtMap = map[string]string{
+	"mp3":  "mp3",
+	"opus": "opus",
+	"aac":  "aac",
+	"flac": "aac",
+	"wav":  "aac",
+	"pcm":  "aac",
+}
+
+var ttsTypeMap = map[string]string{
+	"mp3":  "audio/mpeg",
+	"opus": "audio/ogg",
+	"aac":  "audio/aac",
+}
+
+var ttsVoiceMap = map[string]string{
+	"alloy":   "cove",
+	"echo":    "ember",
+	"fable":   "breeze",
+	"onyx":    "cove",
+	"nova":    "juniper",
+	"shimmer": "juniper",
+}
+
+func tts(c *gin.Context) {
+	var original_request official_types.TTSAPIRequest
+	err := c.BindJSON(&original_request)
+	if err != nil {
+		c.JSON(400, gin.H{"error": gin.H{
+			"message": "Request must be proper JSON",
+			"type":    "invalid_request_error",
+			"param":   nil,
+			"code":    err.Error(),
+		}})
+		return
+	}
+
+	account, secret := getSecret()
+	if account == "" || secret.PUID == "" {
+		c.JSON(500, gin.H{"error": "Plus user only"})
+		return
+	}
+	var proxy_url string
+	if len(proxies) == 0 {
+		proxy_url = ""
+	} else {
+		proxy_url = proxies[0]
+		// Push used proxy to the back of the list
+		proxies = append(proxies[1:], proxies[0])
+	}
+	var deviceId = generateUUID(account)
+	chatgpt.SetOAICookie(deviceId)
+	chat_require := chatgpt.CheckRequire(&secret, deviceId, proxy_url)
+	if chat_require == nil {
+		c.JSON(500, gin.H{"error": "unable to check chat requirement"})
+		return
+	}
+	var proofToken string
+	if chat_require.Proof.Required {
+		proofToken = chatgpt.CalcProofToken(chat_require, proxy_url)
+	}
+	var arkoseToken string
+	if chat_require.Arkose.Required {
+		arkoseToken, err = arkose.GetOpenAIToken(4, secret.PUID, chat_require.Arkose.DX, proxy_url)
+		if err != nil {
+			println("Error getting Arkose token: ", err)
+		}
+	}
+	// Convert the chat request to a ChatGPT request
+	translated_request := chatgpt_request_converter.ConvertTTSAPIRequest(original_request.Input)
+
+	response, err := chatgpt.POSTconversation(translated_request, &secret, deviceId, chat_require.Token, arkoseToken, proofToken, proxy_url)
+	if err != nil {
+		c.JSON(500, gin.H{
+			"error": "error sending request",
+		})
+		return
+	}
+	defer response.Body.Close()
+	if chatgpt.Handle_request_error(c, response) {
+		return
+	}
+	msgId, convId := chatgpt.HandlerTTS(response, original_request.Input)
+	format := ttsFmtMap[original_request.Format]
+	if format == "" {
+		format = "aac"
+	}
+	voice := ttsVoiceMap[original_request.Voice]
+	if voice == "" {
+		voice = "cove"
+	}
+	apiUrl := "https://chatgpt.com/backend-api/synthesize?message_id=" + msgId + "&conversation_id=" + convId + "&voice=" + voice + "&format=" + format
+	data := chatgpt.GetTTS(&secret, deviceId, apiUrl, proxy_url)
+	if data != nil {
+		c.Data(200, ttsTypeMap[format], data)
+	}
+	chatgpt.RemoveConversation(&secret, deviceId, convId, proxy_url)
 }

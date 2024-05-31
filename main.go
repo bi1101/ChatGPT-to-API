@@ -85,6 +85,9 @@ func main() {
 	/// Public routes
 	router.OPTIONS("/v1/chat/completions", optionsHandler)
 	router.POST("/v1/chat/completions", Authorization, nightmare)
+	router.OPTIONS("/v1/audio/speech", optionsHandler)
+	router.POST("/v1/audio/speech", Authorization, tts)
+	router.OPTIONS("/v1/models", optionsHandler)
 	router.GET("/v1/models", Authorization, simulateModel)
 	if tlsCert != "" && tlsKey != "" {
 		endless.ListenAndServeTLS(HOST+":"+PORT, tlsCert, tlsKey, router)
