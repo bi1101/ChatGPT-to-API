@@ -147,6 +147,7 @@ func nightmare(c *gin.Context) {
 		chatgpt.SetOAICookie(deviceId)
 	}
 	chat_require := chatgpt.CheckRequire(&secret, deviceId, proxy_url)
+	var err error
 	if chat_require == nil {
 		c.JSON(500, gin.H{"error": "unable to check chat requirement"})
 		return
