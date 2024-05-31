@@ -88,6 +88,9 @@ func newRequest(method string, url string, body io.Reader, secret *tokens.Secret
 	if secret.Token != "" {
 		request.Header.Set("Authorization", "Bearer "+secret.Token)
 	}
+	if secret.PUID == "" {
+		secret.PUID = os.Getenv("PUID")
+	}
 	if secret.PUID != "" {
 		request.Header.Set("Cookie", "_puid="+secret.PUID+";")
 	}
