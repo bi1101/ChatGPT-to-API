@@ -296,9 +296,7 @@ func tts(c *gin.Context) {
 
 	response, err := chatgpt.POSTconversation(translated_request, &secret, deviceId, chat_require.Token, arkoseToken, proofToken, proxy_url)
 	if err != nil {
-		c.JSON(500, gin.H{
-			"error": "error sending request",
-		})
+		c.JSON(500, gin.H{"error": "error sending request"})
 		return
 	}
 	defer response.Body.Close()
@@ -318,6 +316,47 @@ func tts(c *gin.Context) {
 	data := chatgpt.GetTTS(&secret, deviceId, apiUrl, proxy_url)
 	if data != nil {
 		c.Data(200, ttsTypeMap[format], data)
+	} else {
+		c.JSON(500, gin.H{"error": "synthesize error"})
 	}
 	chatgpt.RemoveConversation(&secret, deviceId, convId, proxy_url)
+}
+
+func stt(c *gin.Context) {
+	file, header, err := c.Request.FormFile("file")
+	if err != nil {
+		println(err.Error())
+		c.JSON(400, gin.H{"error": gin.H{
+			"message": "Request must has proper file",
+			"type":    "invalid_request_error",
+			"param":   nil,
+			"code":    err.Error(),
+		}})
+		return
+	}
+	defer file.Close()
+	lang := c.Request.FormValue("language")
+
+	account, secret := getSecret()
+	if account == "" {
+		c.JSON(500, gin.H{"error": "Logined user only"})
+		return
+	}
+	var proxy_url string
+	if len(proxies) == 0 {
+		proxy_url = ""
+	} else {
+		proxy_url = proxies[0]
+		// Push used proxy to the back of the list
+		proxies = append(proxies[1:], proxies[0])
+	}
+	var deviceId = generateUUID(account)
+	chatgpt.SetOAICookie(deviceId)
+
+	data := chatgpt.GetSTT(file, header, lang, &secret, deviceId, proxy_url)
+	if data != nil {
+		c.Data(200, "application/json", data)
+	} else {
+		c.JSON(500, gin.H{"error": "transcribe error"})
+	}
 }

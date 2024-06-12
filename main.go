@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	chatgpt_types "freechatgpt/typings/chatgpt"
+	chatgpt_types "freechatgpt/internal/chatgpt"
 
 	"github.com/acheong08/endless"
 	"github.com/gin-gonic/gin"
@@ -87,6 +87,8 @@ func main() {
 	router.POST("/v1/chat/completions", Authorization, nightmare)
 	router.OPTIONS("/v1/audio/speech", optionsHandler)
 	router.POST("/v1/audio/speech", Authorization, tts)
+	router.OPTIONS("/v1/audio/transcriptions", optionsHandler)
+	router.POST("/v1/audio/transcriptions", Authorization, stt)
 	router.OPTIONS("/v1/models", optionsHandler)
 	router.GET("/v1/models", Authorization, simulateModel)
 	if tlsCert != "" && tlsKey != "" {

@@ -11,6 +11,7 @@ import (
 	chatgpt_types "freechatgpt/typings/chatgpt"
 	"io"
 	"math/rand"
+	"mime/multipart"
 	"net/url"
 	"os"
 	"strconv"
@@ -84,7 +85,7 @@ func newRequest(method string, url string, body io.Reader, secret *tokens.Secret
 	request.Header.Set("User-Agent", userAgent)
 	request.Header.Set("Accept", "*/*")
 	request.Header.Set("Oai-Device-Id", deviceId)
-	request.Header.Set("Oai-Language", "zh-CN")
+	request.Header.Set("Oai-Language", "en-US")
 	if secret.Token != "" {
 		request.Header.Set("Authorization", "Bearer "+secret.Token)
 	}
@@ -104,9 +105,6 @@ func SetOAICookie(uuid string) {
 	client.GetCookieJar().SetCookies(hostURL, []*http.Cookie{{
 		Name:  "oai-did",
 		Value: uuid,
-	}, {
-		Name:  "oai-dm-tgt-c-240329",
-		Value: "2024-04-02",
 	}})
 }
 
@@ -165,7 +163,7 @@ func getConfig() []interface{} {
 	rand.New(rand.NewSource(time.Now().UnixNano()))
 	script := cachedScripts[rand.Intn(len(cachedScripts))]
 	timeNum := (float64(time.Since(startTime).Nanoseconds()) + rand.Float64()) / 1e6
-	return []interface{}{cachedHardware, getParseTime(), int64(4294705152), 0, userAgent, script, cachedDpl, "zh-CN", "zh-CN", 0, "webkitGetUserMedia−function webkitGetUserMedia() { [native code] }", "location", "ontransitionend", timeNum, cachedSid}
+	return []interface{}{cachedHardware, getParseTime(), int64(4294705152), 0, userAgent, script, cachedDpl, "en-US", "en-US", 0, "webkitGetUserMedia−function webkitGetUserMedia() { [native code] }", "location", "ontransitionend", timeNum, cachedSid}
 }
 func CalcProofToken(require *ChatRequire, proxy string) string {
 	proof := generateAnswer(require.Proof.Seed, require.Proof.Difficulty, proxy)
@@ -266,7 +264,7 @@ func getURLAttribution(secret *tokens.Secret, deviceId string, url string) strin
 	return attr.Attribution
 }
 
-func POSTconversation(message chatgpt_types.ChatGPTRequest, secret *tokens.Secret, deviceId string, chat_token string, arkoseToken string, proofToken string, proxy string) (*http.Response, error) {
+func POSTconversation(message ChatGPTRequest, secret *tokens.Secret, deviceId string, chat_token string, arkoseToken string, proofToken string, proxy string) (*http.Response, error) {
 	if proxy != "" {
 		client.SetProxy(proxy)
 	}
@@ -617,11 +615,68 @@ func GetTTS(secret *tokens.Secret, deviceId string, url string, proxy string) []
 		return nil
 	}
 	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return nil
+	}
 	blob, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nil
 	}
 	return blob
+}
+
+func generateRandomString(n int) string {
+	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	rand.New(rand.NewSource(time.Now().UnixNano()))
+	bytes := make([]byte, n)
+	for i := range bytes {
+		bytes[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(bytes)
+}
+
+func GetSTT(file multipart.File, header *multipart.FileHeader, lang string, secret *tokens.Secret, deviceId string, proxy string) []byte {
+	if proxy != "" {
+		client.SetProxy(proxy)
+	}
+	var b bytes.Buffer
+	w := multipart.NewWriter(&b)
+	boundary := "----WebKitFormBoundary" + generateRandomString(16)
+	w.SetBoundary(boundary)
+	part, err := w.CreatePart(header.Header)
+	if err != nil {
+		return nil
+	}
+	_, err = io.Copy(part, file)
+	if err != nil {
+		return nil
+	}
+	if lang != "" {
+		part, err := w.CreateFormField("language")
+		if err != nil {
+			return nil
+		}
+		part.Write([]byte(lang))
+	}
+	w.Close()
+	request, err := newRequest(http.MethodPost, "https://chatgpt.com/backend-api/transcribe", &b, secret, deviceId)
+	request.Header.Set("Content-Type", w.FormDataContentType())
+	if err != nil {
+		return nil
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		return nil
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return nil
+	}
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return nil
+	}
+	return body
 }
 
 func RemoveConversation(secret *tokens.Secret, deviceId string, id string, proxy string) {
