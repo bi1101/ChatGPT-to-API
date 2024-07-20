@@ -197,10 +197,14 @@ type ChatRequire struct {
 		Required bool   `json:"required"`
 		DX       string `json:"dx,omitempty"`
 	} `json:"arkose"`
+	Turnstile struct {
+		Required bool   `json:"required"`
+		DX       string `json:"dx,omitempty"`
+	} `json:"turnstile"`
 	ForceLogin bool `json:"force_login,omitempty"`
 }
 
-func CheckRequire(secret *tokens.Secret, deviceId string, proxy string) *ChatRequire {
+func CheckRequire(secret *tokens.Secret, deviceId string, proxy string) (*ChatRequire, string) {
 	if proxy != "" {
 		client.SetProxy(proxy)
 	}
@@ -216,23 +220,23 @@ func CheckRequire(secret *tokens.Secret, deviceId string, proxy string) *ChatReq
 	}
 	request, err := newRequest(http.MethodPost, apiUrl, body, secret, deviceId)
 	if err != nil {
-		return nil
+		return nil, ""
 	}
 	request.Header.Set("Content-Type", "application/json")
 	response, err := client.Do(request)
 	if err != nil {
-		return nil
+		return nil, ""
 	}
 	defer response.Body.Close()
 	var require ChatRequire
 	err = json.NewDecoder(response.Body).Decode(&require)
 	if err != nil {
-		return nil
+		return nil, ""
 	}
 	if require.ForceLogin {
-		return nil
+		return nil, ""
 	}
-	return &require
+	return &require, cachedRequireProof
 }
 
 var urlAttrMap = make(map[string]string)
@@ -248,9 +252,6 @@ func getURLAttribution(secret *tokens.Secret, deviceId string, url string) strin
 		return ""
 	}
 	request.Header.Set("Content-Type", "application/json")
-	if err != nil {
-		return ""
-	}
 	response, err := client.Do(request)
 	if err != nil {
 		return ""
@@ -264,7 +265,7 @@ func getURLAttribution(secret *tokens.Secret, deviceId string, url string) strin
 	return attr.Attribution
 }
 
-func POSTconversation(message ChatGPTRequest, secret *tokens.Secret, deviceId string, chat_token string, arkoseToken string, proofToken string, proxy string) (*http.Response, error) {
+func POSTconversation(message ChatGPTRequest, secret *tokens.Secret, deviceId string, chat_token string, arkoseToken string, proofToken string, turnstileToken string, proxy string) (*http.Response, error) {
 	if proxy != "" {
 		client.SetProxy(proxy)
 	}
@@ -304,12 +305,15 @@ func POSTconversation(message ChatGPTRequest, secret *tokens.Secret, deviceId st
 	if proofToken != "" {
 		request.Header.Set("Openai-Sentinel-Proof-Token", proofToken)
 	}
+	if turnstileToken != "" {
+		request.Header.Set("Openai-Sentinel-Turnstile-Token", turnstileToken)
+	}
 	request.Header.Set("Origin", "https://chatgpt.com")
 	request.Header.Set("Referer", "https://chatgpt.com/")
+	response, err := client.Do(request)
 	if err != nil {
 		return &http.Response{}, err
 	}
-	response, err := client.Do(request)
 	return response, err
 }
 
@@ -382,7 +386,25 @@ func GetImageSource(wg *sync.WaitGroup, url string, prompt string, secret *token
 	if err != nil || file_info.Status != "success" {
 		return
 	}
+	// if strings.HasPrefix(file_info.DownloadURL, "http") {
 	imgSource[idx] = "[![image](" + file_info.DownloadURL + " \"" + prompt + "\")](" + file_info.DownloadURL + ")"
+	// } else {
+	// 	req, err := newRequest(http.MethodGet, "https://chatgpt.com"+file_info.DownloadURL, nil, secret, deviceId)
+	// 	req.Header.Set("Accept", "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8")
+	// 	if err != nil {
+	// 		return
+	// 	}
+	// 	client.SetFollowRedirect(false)
+	// 	resp, err := client.Do(req)
+	// 	if err != nil {
+	// 		return
+	// 	}
+	// 	defer resp.Body.Close()
+	// 	redirURL := resp.Header.Get("Location")
+	// 	if redirURL != "" {
+	// 		imgSource[idx] = "[![image](" + redirURL + " \"" + prompt + "\")](" + redirURL + ")"
+	// 	}
+	// }
 }
 
 func Handler(c *gin.Context, response *http.Response, secret *tokens.Secret, proxy string, deviceId string, uuid string, stream bool) (string, *ContinueInfo) {

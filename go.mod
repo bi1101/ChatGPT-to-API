@@ -1,8 +1,6 @@
 module freechatgpt
 
-go 1.21.1
-
-toolchain go1.22.0
+go 1.22
 
 require (
 	github.com/PuerkitoBio/goquery v1.9.2
@@ -17,8 +15,8 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/sashabaranov/go-openai v1.25.0
 	github.com/tidwall/gjson v1.17.1
-	github.com/xqdoo00o/OpenAIAuth v0.0.0-20240617101336-7c21c3eb80ad
-	github.com/xqdoo00o/funcaptcha v0.0.0-20240507071758-6c32cfc34bdc
+	github.com/xqdoo00o/OpenAIAuth v0.0.0-20240701110453-a742f7a5ea18
+	github.com/xqdoo00o/funcaptcha v0.0.0-20240701110249-093b35d56d32
 	github.com/zhu327/gemini-openai-proxy v0.0.0-20240614084250-9d1fbf627a52
 	golang.org/x/crypto v0.24.0
 	golang.org/x/image v0.15.0
